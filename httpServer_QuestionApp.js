@@ -1,3 +1,4 @@
+// This file is adpated from the tutorial of this module
 // add an http server to serve files to the Edge browser 
 // due to certificate issues it rejects the https files if they are not
 // directly called in a typed URL
@@ -47,109 +48,6 @@ app.use(function(req, res, next) {
         next();
 });
 
-app.get('/getGeoJSON/:tablename/:geomcolumn', function (req,res) {
-	pool.connect(function(err,client,done) {
-	if(err){
-		console.log("not able to get connection "+ err);
-		res.status(400).send(err);
-	}
-	var colnames = "";
-	// first get a list of the columns that are in the table
-	// use string_agg to generate a comma separated list that can then be pasted into the next query
-	var querystring = "select string_agg(colname,',') from ( select column_name as colname ";
-	querystring = querystring + " FROM information_schema.columns as colname ";
-	querystring = querystring + " where table_name = '"+ req.params.tablename +"'";
-	querystring = querystring + " and column_name <> '"+req.params.geomcolumn +"') as cols ";
-	console.log(querystring);
-
-	// now run the query
-	client.query(querystring,function(err,result){
-		//call `done()` to release the client back to the pool
-		console.log("trying");
-		done();
-		if(err){
-			console.log(err);
-			res.status(400).send(err);
-		}
-		 for (var i =0; i< result.rows.length ;i++) {
-		 console.log(result.rows[i].string_agg);
-		 }
-		thecolnames = result.rows[0].string_agg;
-		colnames = thecolnames;
-		console.log("the colnames "+thecolnames);
-		// now use the inbuilt geoJSON functionality
-		// and create the required geoJSON format using a query adapted from here:
-		// http://www.postgresonline.com/journal/archives/267-CreatingGeoJSON-Feature-Collections-with-JSON-and-PostGIS-functions.html, accessed 4th January 2018
-		// note that query needs to be a single string with no line breaks so built it up bit by bit
-		var querystring = " SELECT 'FeatureCollection' As type, array_to_json(array_agg(f)) As features FROM ";
-		querystring = querystring + "(SELECT 'Feature' As type , ST_AsGeoJSON(lg." + req.params.geomcolumn+")::json As geometry, ";
-		querystring = querystring + "row_to_json((SELECT l FROM (SELECT "+colnames + ") As l )) As properties";
-		querystring = querystring + " FROM "+req.params.tablename+" As lg limit 100 ) As f ";
-		console.log(querystring);
-		// run the second query
-		client.query(querystring,function(err,result){
-		//call `done()` to release the client back to the pool
-			done();
-			if(err){
-				console.log(err);
-				res.status(400).send(err);
-			}
-				res.status(200).send(result.rows);
-			});
-
-		});
-	});
-});
-
-
-app.get('/getPOI',function(req,res){
-    pool.connect(function(err,client,done){
-        if(err){
-            console.log("not able to get connection "+ err);
-            res.status(400).send(err);
-        }
-		
-        //use the inbuilt geoJSON functionality
-        //and create the required geoJSON format using a query adapted from here:http://www.postgresonline.com/journal/archives/267-Creating-GeoJSON-Feature-Collections-with-JSON-and-PostGIS-functions.html, accessed 4th January 2018
-        //note that query needs to be a single string with no line breaks so built it up bit by bit
-        
-        var querystring  = "select 'FeatureCollection' as type, array_to_json(array_agg(f)) as features FROM ";
-        querystring = querystring + "(select 'Feature' as type, st_asgeojson(lg.geom)::json as geometry, ";
-        querystring = querystring + "row_to_json((select l from (select id,name,category) as l)) as properties";
-		querystring = querystring + "  from united_kingdom_poi as lg limit 100) as f";
-		console.log(querystring);
-		
-		//run the second query
-		client.query(querystring,function(err,result){
-			//call 'done()' to release the client back to the pool
-			done();
-			if(err){
-				console.log(err);
-				res.status(400).send(err);
-			}
-			res.status(200).send(result.rows);
-		});
-		
-    });
-});
-
-app.get('/postgistest', function(req,res){
-    pool.connect(function(err,client,done){
-        if(err){
-            console.log("not able to get connection "+ err);
-            res.status(400).send(err);
-        }
-        client.query('select name from united_kingdom_counties',function(err,result)
-        {
-        done();
-        if(err){
-            console.log(err);
-            res.status(400).send(err);
-        }
-        res.status(200).send(result.rows);
-        });
-    });
-});
 
 app.get('/SettershowQuestionData', function(req,res){
     pool.connect(function(err,client,done){
@@ -187,6 +85,7 @@ app.use(bodyParser.urlencoded({
 }));
 app.use(bodyParser.json());
 
+// This part is for inserting the data inside the question table of question app
 app.post('/uploadData',function(req,res){
 // note that we are using POST here as we are uploading data
 // so the parameters form part of the BODY of the request rather than the RESTful API
